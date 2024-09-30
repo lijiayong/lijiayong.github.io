@@ -23,7 +23,7 @@ description: >- # used by seo meta and the atom feed
 
 # Fill in the protocol & hostname for your site.
 # E.g. 'https://username.github.io', note that it does not end with a '/'.
-url: 'https://lijiayong.github.io'
+url: "https://lijiayong.github.io"
 
 github:
   username: lijiayong # change to your GitHub username
@@ -216,11 +216,10 @@ exclude:
   - package*.json
 
 jekyll-archives:
-  # enabled: [categories, tags]
-  enabled: [tags]
+  enabled: [categories, tags]
   layouts:
-    # category: category
+    category: category
     tag: tag
   permalinks:
     tag: /tags/:name/
-    # category: /categories/:name/
+    category: /categories/:name/
