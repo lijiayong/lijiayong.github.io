@@ -4,5 +4,4 @@ icon: fas fa-info-circle
 order: 4
 ---
 
-> Add Markdown syntax content to file `_tabs/about.md`{: .filepath } and it will show up on this page.
-{: .prompt-tip }
+I'm Jiayong Li, a data scientist with a math PhD from MIT. In my spare time I'm interested in mental health, social media, web development, and games. I enjoy building communities where members can support each other.
