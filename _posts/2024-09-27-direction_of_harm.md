@@ -3,7 +3,7 @@ title: Can AI detect the direction of harm? Building a model for message moderat
 date: 2024-09-27
 tags: [mental health, social media]
 image:
-    path: /asset/img/headers/heart-shaped-graffiti-art.jpg
+    path: /assets/img/headers/heart-shaped-graffiti-art.jpg
 ---
 
 # Introduction
