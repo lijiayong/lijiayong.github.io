@@ -157,3 +157,5 @@ Note that the "self harm" label has the best result despite having the smallest 
 The results are competitive but aren't perfect. This is a hard problem. When I manually labeled data the challenge not only lies in determining the direction of harm, but in judging the level of harm as well. I imagine a machine learning model would struggle with it too. When it comes to message moderation it won't replace human moderators, but it can greatly reduce the workload.
 
 The inference time for harm DeBERTa is 10ms per sample on GPU, which is acceptable for message moderation. My next step is to reduce the cost by applying [quantiziaion](https://huggingface.co/docs/optimum/en/onnxruntime/usage_guides/quantization) to the model. Quantization is a method of mapping high-precision weights (fp32) to low-precision weights (int8). Doing this will sacrifice model's performance slightly for a significant gain in speed. It enables 10ms per sample inference on CPU, which makes this message moderation tool available on any server.
+
+*I'd like to thank my friend Stephen Voinea for his insightful advice on this project.*
