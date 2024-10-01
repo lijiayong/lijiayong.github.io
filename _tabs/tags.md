@@ -1,3 +1,3 @@
 layout: tags
 icon: fas fa-tags
-order:
+order: 2
