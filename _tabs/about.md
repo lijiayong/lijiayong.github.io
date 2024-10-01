@@ -4,4 +4,4 @@ icon: fas fa-info-circle
 order: 4
 ---
 
-I'm Jiayong Li, a data scientist with a math PhD from MIT. In my spare time I'm interested in mental health, social media, web development, and games. I enjoy building communities where members can grow together and support each other.
+I'm Jiayong Li, a data scientist with a math PhD from MIT. In my spare time I'm interested in mental health, social media, web development, and games. I enjoy building supportive communities where people grow together.
