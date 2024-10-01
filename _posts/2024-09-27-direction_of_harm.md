@@ -1,7 +1,7 @@
 ---
 title: Can AI detect the direction of harm? Building a model for message moderation on social media platforms
 date: 2024-09-27
-tags: [mental health, social media]
+tags: [mental health, social media, NLP, LLM]
 image:
     path: /assets/img/headers/heart-shaped-graffiti-art.jpg
 ---
