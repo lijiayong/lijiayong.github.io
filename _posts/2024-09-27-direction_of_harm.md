@@ -175,7 +175,7 @@ The 0 toxic data have 144,210 samples, it represents samples with no harm labels
 In order to quickly identify those with harm labels in 0 toxic data set, I considered using the fine-tuned gpt-4o-mini again, but Open AI's daily token limit is a problem due to the large amount of input data. So I decided to fine-tune a DeBERTa model using the positive data only, and use that fine-tuned model to carry out the filtering. For lack of a better word, I refered to this process as [prep training](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Harm_DeBERTa_Train.ipynb). This filtered out 24% of the 0 toxic data.
 
 # Training
-I combined the positive and the negative data set and performed a multi-label train/test split. I then [fine-tuned](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Harm_DeBERTa_Train.ipynb) a DeBERTa model based on the training set and [evaluated](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Harm_DeBERTa_Inference.ipynb) on the test set. The results are as follows.
+I combined the positive and the negative data set and performed a multi-label train/test split. I then [fine-tuned](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Harm_DeBERTa_Train.ipynb) a DeBERTa model based on the training set with `num_train_epochs=4`, `per_device_train_batch_size=32`, `learning_rate=1e-5`, and AdamW optimizer, and [evaluated](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Harm_DeBERTa_Inference.ipynb) on the test set. The results are as follows.
 
 | | self_harm | harming_others | harmed_by_others | reference_to_harm |
 | --- | --- | --- | --- | --- |
@@ -185,7 +185,7 @@ I combined the positive and the negative data set and performed a multi-label tr
 Note that the "self harm" label has the best result despite having the smallest amount of data, this is likely due to "self harm" having the most distinct language compared to other harm labels.
 
 # Summary and next step
-The results aren't perfect but are competitive when compared to toxic DeBERTa (AUC 0.97, F1 0.66). This is a hard problem. When I manually labeled data the challenge not only lies in determining the direction of harm, but in judging the level of harm as well. I imagine a machine learning model would struggle with it too. When it comes to message moderation it won't replace human moderators, but it can greatly reduce the workload.
+The results aren't perfect but are competitive when compared to toxic DeBERTa (AUC=0.97, F1=0.66). This is a hard problem. When I manually labeled data the challenge not only lies in determining the direction of harm, but in judging the level of harm as well. I imagine a machine learning model would struggle with it too. When it comes to message moderation it won't replace human moderators, but it can greatly reduce the workload.
 
 The inference time for harm DeBERTa is 10ms per sample on GPU, which is acceptable for message moderation. My next step is to reduce the cost by applying [quantiziaion](https://huggingface.co/docs/optimum/en/onnxruntime/usage_guides/quantization) to the model. Quantization is a method of mapping high-precision weights (fp32) to low-precision weights (int8). Doing this will sacrifice model's performance slightly for a significant gain in speed. It enables 10ms per sample inference on CPU, which makes this message moderation tool available on any server.
 
