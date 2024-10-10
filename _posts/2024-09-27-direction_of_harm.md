@@ -189,4 +189,4 @@ The results aren't perfect but are competitive when compared to toxic DeBERTa (A
 
 The inference time for harm DeBERTa is 10ms per sample on GPU, which is acceptable for message moderation. My next step is to reduce the cost by applying [quantiziaion](https://huggingface.co/docs/optimum/en/onnxruntime/usage_guides/quantization) to the model. Quantization is a method of mapping high-precision weights (fp32) to low-precision weights (int8). Doing this will sacrifice model's performance slightly for a significant gain in speed. It enables 10ms per sample inference on CPU, which makes this message moderation tool available on any server.
 
-*I'd like to thank my friend Stephen Voinea, Abram Connelley, and Scott Oddo for their insightful advice on this project.*
+*I'd like to thank my friends Stephen Voinea, Abram Connelley, and Scott Oddo for their insightful advice on this project.*
