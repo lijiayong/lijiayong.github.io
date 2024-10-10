@@ -14,12 +14,12 @@ What are some existing work in this area? [Google's Jigsaw team](https://current
 | | self_harm | harming_others | harmed_by_others | reference_to_harm |
 | --- | --- | --- | --- | --- |
 | I'm trash | 1 | 0 | 0 | 0 |
-| He's trash | 0 | 1 | 0 | 0 |
-| She told me I'm trash | 0 | 0 | 1 | 0 |
-| He told her she's trash | 0 | 0 | 0 | 1 |
-| He told her she’s trash and I agree | 0 | 1 | 0 | 1 |
+| John is trash | 0 | 1 | 0 | 0 |
+| Mary told me I'm trash | 0 | 0 | 1 | 0 |
+| Adam told Jane she's trash | 0 | 0 | 0 | 1 |
+| Adam told Jane she’s trash and I agree | 0 | 1 | 0 | 1 |
 
-In the case of "He told her she’s trash and I agree", by endorsing a reference of harm, "I" as the user is also harming others. This is a multi-label classification problem—the labels are not mutually exclusive in a given text. I visualize these examples as a directed graph, where "I" is a special node.
+In the case of "Adam told Jane she’s trash and I agree", by endorsing a reference of harm, "I" as the user is also harming others. This is a multi-label classification problem—the labels are not mutually exclusive in a given text. I visualize these examples as a directed graph, where "I" is a special node.
 
 | ![Graph of harm](/assets/img/posts/graph_of_harm.png) |
 |:--:|
@@ -29,10 +29,10 @@ Once we have these labels, what can I do with them? From a moderation point of v
 
 | | self_harm | harming_others | harmed_by_others | reference_to_harm |
 | --- | --- | --- | --- | --- |
-| response to author | suicide helpline | warning/block message | abuse helpline | |
+| response to author | suicide helpline | warning/block message | bully/abuse helpline | |
 | response to others | trigger warning | prompt user to report | trigger warning | trigger warning |
 
-What are some of the requirements of this classification model? It needs to have competitive AUC and F1 score for each label. (I did not include accuracy as a metric since our data set is unbalanced.) Beside prediction power, the model needs to be fast due to our desired application in message moderation. A latency of 10ms per message is acceptable. This constrains our model to be a relatively small one. Hence various LLM's are less than ideal due to response time, and cost is a factor too. I chose [Microsoft's DeBERTa-v3-small](https://huggingface.co/microsoft/deberta-v3-small) as the base model, it's a transformer based encoder model with only 44M parameters. As a BERT variant, DeBERTa is pre-trained on a large corpus of texts and understands basic semantics, we shall fine-tune it with training data that represent each direction of harm.
+What are some of the requirements of this classification model? It needs to have competitive [AUC](https://developers.google.com/machine-learning/crash-course/classification/roc-and-auc) and [F1 score](https://en.wikipedia.org/wiki/F-score) for each label. I did not include [accuracy](https://en.wikipedia.org/wiki/Accuracy_and_precision#In_classification) as a metric since our data set is unbalanced—I have a lot more data that are negative in harm labels than there are positive. (Labeling positive data is resource intensive.) Beside prediction power, the model needs to be fast due to our desired application in message moderation. A latency of 10ms per message on a coud server is acceptable. This constrains our model to be a relatively small one. Hence various LLM's are less than ideal due to response time, and cost is a factor too—using a generative decoder model for a classification problem is not necessary. I chose [Microsoft's DeBERTa-v3-small](https://huggingface.co/microsoft/deberta-v3-small) as the base model, it's a transformer based encoder model with only 44M parameters. As a BERT variant, DeBERTa is pre-trained on a large corpus of texts and understands basic semantics, we shall fine-tune it with training data that represent each direction of harm.
 
 The analysis for this blog post is documented in my [direction_of_harm repo](https://github.com/lijiayong/direction_of_harm) in Jupyter notebook format, and I uploaded the data as a [Kaggle data set](https://www.kaggle.com/datasets/jiayongli/direction-of-harm-detection). I shall refer to the relevant notebooks throughout this post.
 
@@ -42,13 +42,12 @@ My starting point is the [Jigsaw Unintended Bias in Toxicity Classification data
 | | toxic_probability |
 | --- | --- |
 | I'm trash | 0.99 |
-| He's trash | 0.99 |
-| She told me I'm trash | 0.99 |
-| He told her she's trash | 0.99 |
-| The shirt is trash | 0.99 |
+| John is trash | 0.99 |
+| Mary told me I'm trash | 0.99 |
+| Adam told Jane she's trash | 0.99 |
 | This keyboard is useless | 0.99 |
 
-As expected, toxic DeBERTa was not able to distinguish the directions and marked all of them as toxic. Interestingly, it considered insults towards inanimate objects as toxic ("The shirt is trash", "This keyboard is useless"). I don't consider these comments to be harmful, unless someone really goes overboard with insulting an object. Indeed, the toxic data set is collected from online comments, and a lot of them are political debates. This means that
+As expected, toxic DeBERTa was not able to distinguish the directions and marked all of them as toxic. Interestingly, it considered insults towards inanimate objects as toxic ("This keyboard is useless"). I don't consider these comments to be harmful, unless someone really goes overboard with insulting an object. This is because the toxic data set is largely collected from online political debates. It means that
 1. they only represent human-to-human interaction, and
 2. they mostly represent the "harming others" label.
 
@@ -140,9 +139,9 @@ The total number of each harm label is as follows.
 | total | 17,799 | 3,125 | 8,305 | 5,585 | 3,402 |
 
 # Labeling data Part II
-The 0 toxic data have 144,210 samples (as a reminder, these are the toxic data with 0 'toxicity' rating), it represents samples with no harm labels in theory. This data set dwarfs the positive data set, so we have a slight data imbalance problem. However, I still plan to include it in training, analogous to using a white background to make a person stand out in the portrait. There is a serious issue with this—the 0 toxic data might not have "harming others" labels, but it contains other harm labels. I'd like to filter them out and retain a purely white background.
+The 0 toxic data have 144,210 samples (as a reminder, these are the toxic data with 0 'toxicity' rating), it represents samples with no harm labels in theory. This data set dwarfs the positive data set, so we have a data imbalance problem. However, I still plan to include it in training, analogous to using a white background to make a person stand out in the portrait. There is a serious issue with this—the 0 toxic data might not have "harming others" labels, but it contains other harm labels. I'd like to filter them out to ensure the quality of the baseline data.
 
-How can I quickly identify those with harm labels in 0 toxic data set? I can use the fine-tuned gpt-4o-mini again, but the daily token limit is a problem due to the large amount of data. So I decided to fine-tune a DeBERTa model using the positive data only, and use that fine-tuned model to carry out the filtering. For lack of a better word, I refered to this process as [prep training](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Harm_DeBERTa_Train.ipynb). This filtered out 24% of the 0 toxic data. I refer to this filtered data set as the *negative data set*.
+In order to quickly identify those with harm labels in 0 toxic data set, I considered using the fine-tuned gpt-4o-mini again, but Open AI's daily token limit is a problem due to the large amount of input data. So I decided to fine-tune a DeBERTa model using the positive data only, and use that fine-tuned model to carry out the filtering. For lack of a better word, I refered to this process as [prep training](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Harm_DeBERTa_Train.ipynb). This filtered out 24% of the 0 toxic data. I refer to this filtered data set as the *negative data set*.
 
 # Training
 I combined the positive and the negative data set and performed a multi-label train/test split. I then [fine-tuned](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Harm_DeBERTa_Train.ipynb) a DeBERTa model based on the training set and [evaluated](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Harm_DeBERTa_Inference.ipynb) on the test set. The results are as follows.
