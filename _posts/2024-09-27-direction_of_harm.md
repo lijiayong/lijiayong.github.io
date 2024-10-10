@@ -39,6 +39,13 @@ What are some of the requirements of this classification model? It needs to have
 In the blog post, I will go through the process of gathering data, labeling data, and training. The training (fine-tuning DeBERTa) step is made simple by [HuggingFace API](https://huggingface.co/docs/transformers/model_doc/auto)—it abstracts away the complexity of PyTorch and makes training fairly standard. The bulk of the work lies in gathering the right data and getting high quality labels. The analysis for this blog post is documented in my [direction_of_harm repo](https://github.com/lijiayong/direction_of_harm) in Jupyter notebook format, and I uploaded the data as a [Kaggle data set](https://www.kaggle.com/datasets/jiayongli/direction-of-harm-detection). I shall refer to the relevant notebooks throughout this post.
 
 # Gathering data
+I will outline the composition of the data sets in the following table and then explain the provenance of each one.
+
+| | suicide watch data | 0.9 toxic data | abusive relationship data | abusive relationship comments data | all beauty data | 0 toxic data |
+| --- | --- | --- | --- | --- | --- | --- |
+| purpose | self harm | harming others | harmed by others | reference to harm | balance 0.9 toxic data | no harm |
+| number of data | 5,680 | 9,226 | 9,516 | 7,497 | 5,371 | 144,210 |
+
 My starting point is the [Jigsaw Unintended Bias in Toxicity Classification data](https://www.kaggle.com/c/jigsaw-unintended-bias-in-toxicity-classification). It's a public data set provided in a 2019 Kaggle competition, in which toxicity is defined as *anything rude, disrespectful or otherwise likely to make someone leave a discussion*. As we can see, the direction of harm is not reflected in the definition. I fine-tuned a DeBERTa model based on this data set alone (let's call it *toxic DeBERTa*) and give our examples a try.
 
 | | toxic_probability |
@@ -55,28 +62,48 @@ As expected, toxic DeBERTa was not able to distinguish the directions and marked
 
 Doing this exercise hightlights the limitation of the toxic data set, but at least I have one harm label down. By choosing data with toxicity greater than or equal to 0.9 ('toxicity' rating comes with the toxic data set), I refer to this data set as *0.9 toxic data*.
 
-My next goal is to find a data set with negative *human-to-object* interactions in order to offset the bias in the 0.9 toxic data. I will label such data as 0 in all harm labels so that our final model can distinguish human-to-human interations from human-to-object interations. To that end, I used the All Beauty subset of the [2018 Amazon Review data](https://nijianmo.github.io/amazon/index.html), specifically I chose the 1 star reviews that scored more than 0.4 by the toxic DeBERTa. Here's an example: "Absolutely disgusting. Do not purchase. It's old and rancid. ZERO STARS". Lastly, I removed some entries where reviewers associated the bad quality of the product with certain geographical locations, since this might inadvertently endorse the denigration of certain countries.
+My next goal is to find a data set with negative *human-to-object* interactions in order to offset the bias in the 0.9 toxic data. I will label such data as 0 in all harm labels so that our final model can distinguish human-to-human interations from human-to-object interations. To that end, I used the All Beauty subset of the [2018 Amazon Review data](https://nijianmo.github.io/amazon/index.html), specifically I chose the 1 star reviews that scored more than 0.4 by the toxic DeBERTa. Here's an example: "Absolutely disgusting. Do not purchase. It's old and rancid. ZERO STARS". Lastly, I removed some entries where reviewers associated the bad quality of the product with certain geographical locations, since this might inadvertently endorse the denigration of some countries.
 
 How do I get representive data for the "self harm" label? I found the public [Suicide and Depression Detection dataset](https://www.kaggle.com/datasets/nikhileswarkomati/suicide-watch), published by Nikhileswar Komati. This data set is collected from two subsections of Reddit: every post from r/SuicideWatch is labeled as "suicide", and every post from r/teenagers is labeled as "non-suicide". An issue I have with this approach is by inspection, not every post in r/SuicideWatch has self harming language, even though the majority of them do. Having said that, collecting data from Reddit is a great idea. Inspired by Nikhileswar's approach, I [scraped](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Reddit_Scrape.ipynb)
 * 1700 posts from r/SuicideWatch for the "self harm" label
 * 1700 posts from r/abusiverelationships for the "harmed by others" label, and 
 * comments of 600 posts of r/abusiverelationships for the "reference to harm" label.
 
-I then [preprocessed](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Preprocess_Data.ipynb) these data by splitting each post to shorter texts (each with fewer than or equal to 10 sentences), and I removed texts that are too short (fewer than or equal to 5 words) due to their lack of context. To clarify, I do not label all texts from r/SuicideWatch as "self harm" and so on, I still go through a careful labeling process. However, I do expect texts from r/SuicideWatch have a high proportion of "self harm" labels, as well a certain proportion of other labels like "harmed by others". Similarly, texts from other subreddit will contain a mix of harm labels.
+I then [preprocessed](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Preprocess_Data.ipynb) these data by splitting each post to shorter texts (each with fewer than or equal to 10 sentences), and I removed texts that are too short (fewer than or equal to 5 words) due to their lack of context. To clarify, I do not label all texts from r/SuicideWatch as "self harm" and so on, I still go through a labeling process detailed in later sections. However, I do expect texts from r/SuicideWatch have a high proportion of "self harm" labels, as well a certain proportion of other labels like "harmed by others". Similarly, texts from other subreddit will contain a mix of harm labels.
 
-Lastly, the toxic data set with 0 in the "toxicity" field is a good source of data for 0's in all direction of harm labels, I refer to this data set as *0 toxic data*.
+Lastly, the toxic data set with 0 in the "toxicity" field is a good source of data for 0's in all harm labels, I refer to this data set as *0 toxic data*, or *negative data*. All other data sets collectively are *positive data*.
 
 # Labeling positive data
-Can LLM label data for you? I will answer that question by the end of this paragraph. I started with some manual labeling, and very quickly I realized this task is more difficult than I expected so I need to establish some judging principles.
-
-The three guiding principles I followed are
+Can LLM label data for you? I will answer that question by the end of this section. I started with some manual labeling, and very quickly I realized this task is more difficult than I expected so I need to establish some judging principles. The three principles I followed are
 1. follow-up reponse principle
 2. action over effect principle
 3. believe the author principle
 
-We also must keep in mind our follow-up reponses, as this will determine what level of harm is labeled 0 versus 1. For example, I label "I mistreated my ex even though I felt bad" as 0, and "I was mistreated by my ex even though they felt bad" as 1.
+To elaborate on point 1, in order to determine the level of harm, I ask myself the question, does this message warrant a follow-up response according to the response table? For example, I adopt the following labels 
 
-To elaborate point 1., in order to determine the level of harm, I ask myself the question, does this message warrant a follow-up response according to the response table? This helps me decide on the "You're an idiot" vs. "I'm an idiot" example. For point 2., I focus on the act of harm instead of the effect of implicit harm. For example, "I'm scared of him" only shows the effect of being scared but the harmful action is absent, I label this text as 0 in "harmed by others". Whereas "I'm scared of what he'll do when he's upset" contains harmful action, I label this text as 1 in "harmed by others". Point 3. is to assume the author is telling the truth. For example, I label "My ex is an abuser" as 1 in "harmed by others", even if the author might not be telling the truth. It is in fact quite harmful to call someone an abuser if they're not, but we have to make an assumption.
+| | harming_others | harmed_by_others |
+| --- | --- | --- |
+| I mistreated my ex and I felt bad about it | 0 | 0 |
+| My ex mistreated me and they felt bad about it | 0 | 1 |
+
+This asymmetry is caused by our follow-up response. In the second sentence it makes sense to direct the user to a bully/abuse helpline, but the first sentence does not indicate enough harm to users on the platform for a warning. In general, we have different threshold for different harm label. "I mistreated my ex and they deserve it" crosses that threshold into a 1 for "harming others".
+
+For point 2, I focus on the act of harm instead of the effect of implicit harm. For example
+
+| | harmed_by_others |
+| --- | --- |
+| I'm scared of him | 0 |
+| I'm scared of what he'll do when he's upset | 1 |
+
+The first sentence only shows the effect of being scared but the harmful action is absent, whereas the second sentence contains harmful action.
+
+Point 3 is to assume the author is telling the truth when we couldn't have known the truth. For example
+
+| | harming_others | harmed_by_others |
+| --- | --- | --- |
+| My ex is an abuser | 0 | 1 |
+
+I label it this way even if the author might not be telling the truth. It's in fact quite harmful to call someone an abuser if they're not, but we have to make an assumption.
 
 I used [Label Studio](https://labelstud.io/) for manual labeling. Initially I provided a prompt and 64 examples for few-shot learning to gpt-4o. Few-shot learning means giving a handful of examples of correct labels to the LLM, in hope that the input will steer the output in the right direction. This approach did not yield the desired result, likely because Open AI has done training/sentiment analysis on similar data, but [their labels](https://platform.openai.com/docs/guides/moderation) have subtle differences. For example, I define "self harm" as belittling oneself or the act/intent of physically hurting oneself, whereas the traditional sentiment analysis would associate a depressive state with "self harm". As a result, Open AI's "self harm" labeling is more sensitive than mine. On top of that, gpt-4o is costly, and I was hitting the [daily token limit](https://platform.openai.com/docs/guides/rate-limits). Naturally, I shifted my strategy to fine-tuning gpt-4o-mini, a much smaller model, using 674 manually labeled training data and 98 validation data. Changing the underlying parameters of the model (fine-tuning) affect the output a lot more than changing the input (few-shot learning). To answer the question whether LLM can label data, yes, but not out of the box. It requires additional work.
 
@@ -125,9 +152,9 @@ response_format = {
 }
 ```
 
-This constrains the output format of the LLM, and eliminated hallucination in my experience. gpt-4o-mini occasionally skipped samples before I used response format.
+Including this in the API call constrains the output format of the LLM, and eliminated hallucination in my experience. gpt-4o-mini occasionally skipped samples before I specified json response format.
 
-Lastly, I used the fine-tuned LLM to [label](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Open_AI_Inference.ipynb) r/SuicideWatch data, r/abusiverelationships data, r/abusiverelationships comments data, and 0.9 toxic data. I then made some adjustment based on manual inspection. For the All Beauty Amazon Review data set, I labeled all of them as 0 except for some rare cases when the reviewer insulted their sellers. Combined with the small set of examples from few-shot learning, let's refer to this entire collection as the *positive data set*. The distribution of harm labels among the positive data set matches my expectation.
+Lastly, I used the fine-tuned LLM to [label](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Open_AI_Inference.ipynb) suicide watch data, 0.9 toxic data, abusive relationships data, and abusive relationships comments data. For the all beauty data, I labeled all of them as 0 except for some rare cases when the reviewer insulted their sellers. The distribution of harm labels among the positive data set matches my expectation.
 
 | ![Distribution four datasets](/assets/img/posts/distribution_four_datasets.png) |
 |:--:|
@@ -143,9 +170,9 @@ The total number of each harm label is as follows.
 | total | 17,799 | 3,125 | 8,305 | 5,585 | 3,402 |
 
 # Labeling negative data
-The 0 toxic data have 144,210 samples (as a reminder, these are the toxic data with 0 'toxicity' rating), it represents samples with no harm labels in theory. This data set dwarfs the positive data set, so we have a data imbalance problem. However, I still plan to include it in training, analogous to using a white background to make a person stand out in the portrait. There is a serious issue with this—the 0 toxic data might not have "harming others" labels, but it contains other harm labels. I'd like to filter them out to ensure the quality of the baseline data.
+The 0 toxic data have 144,210 samples, it represents samples with no harm labels in theory. This data set is quite large so we have a data imbalance problem. However, I still plan to include it in training, analogous to using a white background to make a person stand out in the portrait. There is another serious issue—the 0 toxic data might not have "harming others" labels, but it contains other harm labels. I'd like to filter them out to ensure the quality of the baseline data.
 
-In order to quickly identify those with harm labels in 0 toxic data set, I considered using the fine-tuned gpt-4o-mini again, but Open AI's daily token limit is a problem due to the large amount of input data. So I decided to fine-tune a DeBERTa model using the positive data only, and use that fine-tuned model to carry out the filtering. For lack of a better word, I refered to this process as [prep training](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Harm_DeBERTa_Train.ipynb). This filtered out 24% of the 0 toxic data. I refer to this filtered data set as the *negative data set*.
+In order to quickly identify those with harm labels in 0 toxic data set, I considered using the fine-tuned gpt-4o-mini again, but Open AI's daily token limit is a problem due to the large amount of input data. So I decided to fine-tune a DeBERTa model using the positive data only, and use that fine-tuned model to carry out the filtering. For lack of a better word, I refered to this process as [prep training](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Harm_DeBERTa_Train.ipynb). This filtered out 24% of the 0 toxic data.
 
 # Training
 I combined the positive and the negative data set and performed a multi-label train/test split. I then [fine-tuned](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Harm_DeBERTa_Train.ipynb) a DeBERTa model based on the training set and [evaluated](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Harm_DeBERTa_Inference.ipynb) on the test set. The results are as follows.
@@ -158,8 +185,8 @@ I combined the positive and the negative data set and performed a multi-label tr
 Note that the "self harm" label has the best result despite having the smallest amount of data, this is likely due to "self harm" having the most distinct language compared to other harm labels.
 
 # Summary and next step
-The results are competitive but aren't perfect. This is a hard problem. When I manually labeled data the challenge not only lies in determining the direction of harm, but in judging the level of harm as well. I imagine a machine learning model would struggle with it too. When it comes to message moderation it won't replace human moderators, but it can greatly reduce the workload.
+The results aren't perfect but are competitive when compared to toxic DeBERTa (AUC 0.97, F1 0.66). This is a hard problem. When I manually labeled data the challenge not only lies in determining the direction of harm, but in judging the level of harm as well. I imagine a machine learning model would struggle with it too. When it comes to message moderation it won't replace human moderators, but it can greatly reduce the workload.
 
 The inference time for harm DeBERTa is 10ms per sample on GPU, which is acceptable for message moderation. My next step is to reduce the cost by applying [quantiziaion](https://huggingface.co/docs/optimum/en/onnxruntime/usage_guides/quantization) to the model. Quantization is a method of mapping high-precision weights (fp32) to low-precision weights (int8). Doing this will sacrifice model's performance slightly for a significant gain in speed. It enables 10ms per sample inference on CPU, which makes this message moderation tool available on any server.
 
-*I'd like to thank my friend Stephen Voinea for his insightful advice on this project.*
+*I'd like to thank my friend Stephen Voinea, Abram Connelley, and Scott Oddo for their insightful advice on this project.*
