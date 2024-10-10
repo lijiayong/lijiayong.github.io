@@ -32,9 +32,11 @@ Once we have these labels, what can I do with them? From a moderation point of v
 | response to author | suicide helpline | warning/block message | bully/abuse helpline | |
 | response to others | trigger warning | prompt user to report | trigger warning | trigger warning |
 
+Keep in mind things are not always as simple as in Graph 1, where one can simply change the direction of harm by switching the point of view of a sentence, no matter who's involved. Here are just two nuanced examples. a) "You're an idiot" is very harmful towards others, but "I'm an idiot" could be a self-deprecating comment that doesn't necessarily show self harm. b) "You're not important to me" doesn't mean much coming from strangers, but it's devestating coming from loved ones. Each harm label might have their own speech pattern and their own threshold for the level of harm, but I think there is enough commonality among them to solve these four classification problems in the same model.
+
 What are some of the requirements of this classification model? It needs to have competitive [AUC](https://developers.google.com/machine-learning/crash-course/classification/roc-and-auc) and [F1 score](https://en.wikipedia.org/wiki/F-score) for each label. I did not include [accuracy](https://en.wikipedia.org/wiki/Accuracy_and_precision#In_classification) as a metric since our data set is unbalanced—I have a lot more data that are negative in harm labels than there are positive. (Labeling positive data is resource intensive.) Beside prediction power, the model needs to be fast due to our desired application in message moderation. A latency of 10ms per message on a coud server is acceptable. This constrains our model to be a relatively small one. Hence various LLM's are less than ideal due to response time, and cost is a factor too—using a generative decoder model for a classification problem is not necessary. I chose [Microsoft's DeBERTa-v3-small](https://huggingface.co/microsoft/deberta-v3-small) as the base model, it's a transformer based encoder model with only 44M parameters. As a BERT variant, DeBERTa is pre-trained on a large corpus of texts and understands basic semantics, we shall fine-tune it with training data that represent each direction of harm.
 
-The analysis for this blog post is documented in my [direction_of_harm repo](https://github.com/lijiayong/direction_of_harm) in Jupyter notebook format, and I uploaded the data as a [Kaggle data set](https://www.kaggle.com/datasets/jiayongli/direction-of-harm-detection). I shall refer to the relevant notebooks throughout this post.
+In the blog post, I will go through the process of gathering data, labeling data, and training. The training (fine-tuning DeBERTa) step is made simple by [HuggingFace API](https://huggingface.co/docs/transformers/model_doc/auto)—it abstracts away the complexity of PyTorch and makes training fairly standard. The bulk of the work lies in gathering the right data and getting high quality labels. The analysis for this blog post is documented in my [direction_of_harm repo](https://github.com/lijiayong/direction_of_harm) in Jupyter notebook format, and I uploaded the data as a [Kaggle data set](https://www.kaggle.com/datasets/jiayongli/direction-of-harm-detection). I shall refer to the relevant notebooks throughout this post.
 
 # Gathering data
 My starting point is the [Jigsaw Unintended Bias in Toxicity Classification data](https://www.kaggle.com/c/jigsaw-unintended-bias-in-toxicity-classification). It's a public data set provided in a 2019 Kaggle competition, in which toxicity is defined as *anything rude, disrespectful or otherwise likely to make someone leave a discussion*. As we can see, the direction of harm is not reflected in the definition. I fine-tuned a DeBERTa model based on this data set alone (let's call it *toxic DeBERTa*) and give our examples a try.
@@ -64,13 +66,15 @@ I then [preprocessed](https://github.com/lijiayong/direction_of_harm/blob/main/n
 
 Lastly, the toxic data set with 0 in the "toxicity" field is a good source of data for 0's in all direction of harm labels, I refer to this data set as *0 toxic data*.
 
-# Labeling data Part I
-Can LLM label data for you? I will answer that question by the end of this paragraph. I started with some manual labeling, and very quickly I realized this task is more difficult than I expected. Things are not always as simple as in Graph 1, where one can change the direction of harm by switching the point of view of a sentence. Here are two nuanced examples. a) "You're an idiot" is very harmful towards others, but "I'm an idiot" could be a self-deprecating comment that doesn't necessarily show self harm. b) "You're not important to me" doesn't mean much coming from strangers, but it's devestating coming from loved ones. Such nuance is not captured by Graph 1, so I need to establish some judging principles.
+# Labeling positive data
+Can LLM label data for you? I will answer that question by the end of this paragraph. I started with some manual labeling, and very quickly I realized this task is more difficult than I expected so I need to establish some judging principles.
 
 The three guiding principles I followed are
 1. follow-up reponse principle
 2. action over effect principle
 3. believe the author principle
+
+We also must keep in mind our follow-up reponses, as this will determine what level of harm is labeled 0 versus 1. For example, I label "I mistreated my ex even though I felt bad" as 0, and "I was mistreated by my ex even though they felt bad" as 1.
 
 To elaborate point 1., in order to determine the level of harm, I ask myself the question, does this message warrant a follow-up response according to the response table? This helps me decide on the "You're an idiot" vs. "I'm an idiot" example. For point 2., I focus on the act of harm instead of the effect of implicit harm. For example, "I'm scared of him" only shows the effect of being scared but the harmful action is absent, I label this text as 0 in "harmed by others". Whereas "I'm scared of what he'll do when he's upset" contains harmful action, I label this text as 1 in "harmed by others". Point 3. is to assume the author is telling the truth. For example, I label "My ex is an abuser" as 1 in "harmed by others", even if the author might not be telling the truth. It is in fact quite harmful to call someone an abuser if they're not, but we have to make an assumption.
 
@@ -82,7 +86,7 @@ I used the Open AI API for [fine-tuning gpt-4o-mini and the validation inference
 | --- | --- | --- | --- | --- |
 | F1 | 0.93 | 0.83 | 0.90 | 0.92 |
 
-One trick that helped my batch inference task is taking advantage of the json response format.
+One trick that helped my batch inference task is taking advantage of the [json response format](https://platform.openai.com/docs/guides/structured-outputs/introduction) provided by Open AI API.
 ```python
 response_format = {
     "type": "json_schema",
@@ -138,7 +142,7 @@ The total number of each harm label is as follows.
 | --- | --- | --- | --- | --- | --- |
 | total | 17,799 | 3,125 | 8,305 | 5,585 | 3,402 |
 
-# Labeling data Part II
+# Labeling negative data
 The 0 toxic data have 144,210 samples (as a reminder, these are the toxic data with 0 'toxicity' rating), it represents samples with no harm labels in theory. This data set dwarfs the positive data set, so we have a data imbalance problem. However, I still plan to include it in training, analogous to using a white background to make a person stand out in the portrait. There is a serious issue with this—the 0 toxic data might not have "harming others" labels, but it contains other harm labels. I'd like to filter them out to ensure the quality of the baseline data.
 
 In order to quickly identify those with harm labels in 0 toxic data set, I considered using the fine-tuned gpt-4o-mini again, but Open AI's daily token limit is a problem due to the large amount of input data. So I decided to fine-tune a DeBERTa model using the positive data only, and use that fine-tuned model to carry out the filtering. For lack of a better word, I refered to this process as [prep training](https://github.com/lijiayong/direction_of_harm/blob/main/notebooks/Harm_DeBERTa_Train.ipynb). This filtered out 24% of the 0 toxic data. I refer to this filtered data set as the *negative data set*.
