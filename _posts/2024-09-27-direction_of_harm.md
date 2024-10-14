@@ -86,7 +86,7 @@ To elaborate on point 1, in order to determine the level of harm, I ask myself t
 | I mistreated my ex and I felt bad about it | 0 | 0 |
 | My ex mistreated me and they felt bad about it | 0 | 1 |
 
-This asymmetry is caused by our follow-up response. In the second sentence it makes sense to direct the user to a bully/abuse helpline, but the first sentence does not indicate enough harm to users on the platform for a warning. In general, we have different threshold for different harm label. "I mistreated my ex and they deserve it" crosses that threshold into a 1 for "harming others".
+This asymmetry is caused by our follow-up response. In the second sentence it makes sense to direct the user to a bully/abuse helpline, but the first sentence does not indicate enough harm to users on the platform for a warning. In general, we have different threshold for different harm label. In contrast, "I mistreated my ex and they deserve it" crosses that threshold into a 1 for "harming others".
 
 For point 2, I focus on the act of harm instead of the effect of implicit harm. For example
 
