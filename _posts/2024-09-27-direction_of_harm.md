@@ -9,7 +9,7 @@ image:
 # Introduction
 I got fascinated by mental health Discord servers and forums, they present a great potential for peer support and group healing. However, people in certain distressed states sometimes inadvertently hurt others or themselves. Even by detailing a horrific and traumatic event one can re-traumatize other people who went through similar experiences. This problem is especially salient for direct messages, where there are no moderators to intervene--we can only rely on users' reporting after the harm is dealt. How do we protect users from harm? Hence I set out to solve the message moderation problem with AI.
 
-What are some existing work in this area? [Google's Jigsaw team](https://current.withgoogle.com/the-current/toxicity/) has worked on online harassment, and [Meta](https://about.fb.com/news/2024/09/preventing-suicide-and-self-harm-content-spreading-online/) has worked on suicide prevention. These two problems actually exist in the same problem space: harassment is harm directed from the user to others, and suicide ideation is harm directed from the user to themself. Only the direction is different. By expanding on this idea of the direction of harm, there are four cases: self harm, harming others, harmed by others, and reference of harm. By reference of harm I mean harm directed from others to others. Here are some example texts, all written from a first person perspective.
+What are some existing work in this area? [Google's Jigsaw team](https://current.withgoogle.com/the-current/toxicity/) has worked on online harassment, and [Meta](https://about.fb.com/news/2024/09/preventing-suicide-and-self-harm-content-spreading-online/) has worked on suicide prevention. These two problems actually exist in the same problem space: harassment is harm directed from the user to others, and suicide ideation is harm directed from the user to themself. Only the direction is different. By expanding on this idea of the direction of harm, there are four cases: self harm, harming others, harmed by others, and reference to harm. By reference to harm I mean harm directed from others to others. Here are some example texts, all written from a first person perspective.
 
 | | self_harm | harming_others | harmed_by_others | reference_to_harm |
 | --- | --- | --- | --- | --- |
@@ -19,7 +19,7 @@ What are some existing work in this area? [Google's Jigsaw team](https://current
 | Adam told Jane she's trash | 0 | 0 | 0 | 1 |
 | Adam told Jane she’s trash and I agree | 0 | 1 | 0 | 1 |
 
-In the case of "Adam told Jane she’s trash and I agree", by endorsing a reference of harm, "I" as the user is also harming others. This is a multi-label classification problem—the labels are not mutually exclusive in a given text. I visualize these examples as a directed graph, where "I" is a special node.
+In the case of "Adam told Jane she’s trash and I agree", by endorsing a reference to harm, "I" as the user is also harming others. This is a multi-label classification problem—the labels are not mutually exclusive in a given text. I visualize these examples as a directed graph, where "I" is a special node.
 
 | ![Graph of harm](/assets/img/posts/graph_of_harm.png) |
 |:--:|
